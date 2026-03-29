@@ -1,0 +1,27 @@
+{
+  "name": "agile-task-automator",
+  "version": "1.0.0",
+  "description": "Chrome Extension (Manifest V3) para capturar tasks de Trello/Jira y generar documentación técnica Agile",
+  "author": "Senior Full-Stack Developer",
+  "license": "MIT",
+  "scripts": {
+    "lint": "eslint js/**/*.js --fix",
+    "test": "echo 'Run tests with: npm test'",
+    "build": "echo 'Extension ready for production'",
+    "dev": "echo 'Development mode active - Reload extension after making changes'"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "chrome-extension",
+    "trello",
+    "jira",
+    "agile",
+    "task-automation",
+    "documentation",
+    "manifest-v3"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/agile-task-automator"
+  }
+}
