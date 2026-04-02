@@ -1,33 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Agile Task Automator",
-  "version": "1.0.0",
-  "description": "Cattura task da Trello/Jira e genera documentazione tecnica in Markdown/HTML",
-  "permissions": [
-    "activeTab",
-    "scripting",
-    "storage"
-  ],
-  "host_permissions": [
-    "https://trello.com/*",
-    "https://*.atlassian.net/*"
-  ],
+  "version": "2.0.0",
+  "description": "Trasforma appunti in documentazione tecnica Agile (Markdown) tramite copia-incolla. Veloce, leggero e sicuro.",
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Agile Task Automator"
-  },
-  "content_scripts": [
-    {
-      "matches": [
-        "https://trello.com/*",
-        "https://*.atlassian.net/*"
-      ],
-      "js": ["content.js"],
-      "run_at": "document_end"
-    }
-  ],
-  "background": {
-    "service_worker": "background.js"
+    "default_title": "Agile Automator"
   },
   "icons": {
     "16": "images/icon-16.png",

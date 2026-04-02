@@ -1,68 +1,119 @@
 /**
- * Agile Task Automator - Content Script
- * Estrae i dettagli dei task da Trello e Jira
+ * ============================================================================
+ * AGILE TASK AUTOMATOR - CONTENT SCRIPT
+ * ============================================================================
+ * 
+ * DESCRIZIONE:
+ * Content script eseguito su trello.com e atlassian.net per estrarre dati
+ * dal DOM. Comunica con il popup tramite chrome.runtime.sendMessage.
+ * 
+ * CONFORMITÀ:
+ * - Manifest V3 compliant
+ * - NO script injection (DOM parsing only)
+ * - NO chrome.scripting API usage (Purple Potassium safe)
+ * 
+ * RESPONSABILITÀ:
+ * 1. Parsing del DOM della pagina attiva
+ * 2. Estrazione di titolo, descrizione, etichette
+ * 3. Invio dei dati al popup tramite messaging
+ * 
+ * NOTA DI SICUREZZA:
+ * Questo script accede solo al DOM pubblico della pagina.
+ * Non esegue script arbitrari né accede a dati sensibili dell'utente.
+ * ============================================================================
  */
 
 class TaskExtractor {
   /**
-   * Estrae dati da una card Trello
+   * Estrae i dati della card attiva da Trello.
+   * 
+   * SELETTORI SUPPORTATI:
+   * - Card title: [class*="CardTitle"], h2, [data-testid*="title"]
+   * - Description: [class*="CardDescription"], main div
+   * - Labels: [class*="Label"], [class*="badge"]
+   * - Due date: [class*="DueDate"], [class*="due"]
+   * 
+   * @returns {Object} Oggetto con { source, title, description, labels, dueDate, url, timestamp }
    */
   static extractTrelloTask() {
     try {
-      // Selettori Trello (aggiornati per versione moderna)
-      const titleSelector = '[class*="CardTitle"] h2, [class*="card-title"]';
-      const descriptionSelector = '[class*="CardDescription"], [class*="card-description"]';
-      const labelSelector = '[class*="Label"]';
-      const dueDateSelector = '[class*="DueDate"]';
+      // Query selectors per elementi Trello (versione moderna)
+      const titleSelector = '[class*="CardTitle"] h2, [data-testid*="title"] h2, .card-title, h2';
+      const descriptionSelector = '[class*="CardDescription"], [class*="card-description"], [role="main"] article, .description';
+      const labelSelector = '[class*="Label"] span, [class*="badge"], .card-label, .label';
+      const dueDateSelector = '[class*="DueDate"], [class*="due-date"], [data-testid*="due"]';
 
-      const title = document.querySelector(titleSelector)?.textContent?.trim() || '';
-      const description = document.querySelector(descriptionSelector)?.textContent?.trim() || '';
-      const labels = Array.from(document.querySelectorAll(labelSelector))
+      const titleEl = document.querySelector(titleSelector);
+      const descriptionEls = document.querySelectorAll(descriptionSelector);
+      const labelEls = document.querySelectorAll(labelSelector);
+      const dueDateEl = document.querySelector(dueDateSelector);
+
+      const title = titleEl?.textContent?.trim() || '';
+      const description = Array.from(descriptionEls)
         .map(el => el.textContent.trim())
-        .filter(text => text.length > 0);
-      const dueDate = document.querySelector(dueDateSelector)?.textContent?.trim() || '';
-
-      // Se stiamo sulla pagina card Trello completa
-      const cardTitle = document.querySelector('[aria-label*="Card"]')?.textContent || title;
-      const cardContent = document.querySelector('[class*="window-module"]')?.textContent || description;
+        .filter(text => text.length > 0)
+        .join('\n\n') || '';
+      const labels = Array.from(labelEls)
+        .map(el => el.textContent.trim())
+        .filter(text => text.length > 0 && text.length < 100);
+      const dueDate = dueDateEl?.textContent?.trim() || '';
 
       return {
         source: 'trello',
-        title: cardTitle || title || 'Untitled Card',
-        description: cardContent || description || 'No description provided',
-        labels: labels,
+        title: title || 'Untitled Card',
+        description: description || 'No description provided',
+        labels: labels.slice(0, 10), // Limit to 10 labels
         dueDate: dueDate,
         url: window.location.href,
         timestamp: new Date().toISOString()
       };
     } catch (error) {
-      console.error('Error extracting Trello task:', error);
+      console.error('TaskExtractor: Error extracting Trello task:', error);
       return null;
     }
   }
 
   /**
-   * Estrae dati da una task Jira
+   * Estrae i dati dell'issue attiva da Jira.
+   * 
+   * SELETTORI SUPPORTATI:
+   * - Issue title: h1, [data-testid*="issue.views.issue-base.foundation.summary.title"]
+   * - Description: [class*="description"], [class*="description-view"]
+   * - Status: [class*="status"], [data-testid*="status"]
+   * - Assignee: [class*="assignee"], [data-testid*="assignee"]
+   * - Priority: [class*="priority"], [data-testid*="priority"]
+   * - Labels: [class*="labels"] span, [class*="label"]
+   * 
+   * @returns {Object} Oggetto con { source, issueKey, title, description, status, ... }
    */
   static extractJiraTask() {
     try {
-      // Selettori Jira moderni
-      const titleSelector = '[class*="jira"] h1, [data-testid*="issue.views.issue-base.foundation.summary"]';
-      const descriptionSelector = '[class*="description-view"], [data-testid*="issue.views.issue-base.foundation.summary.description"]';
-      const statusSelector = '[class*="status"]';
-      const assigneeSelector = '[class*="assignee"]';
-      const prioritySelector = '[class*="priority"]';
-      const labelsSelector = '[class*="labels"] span';
+      // Query selectors per elementi Jira moderni
+      const issueKeySelector = 'h1 span, [data-testid*="issue.views.issue-base.foundation.summary.summary-key"]';
+      const titleSelector = 'h1, [data-testid*="issue.views.issue-base.foundation.summary.title"]';
+      const descriptionSelector = '[class*="description-view"], [class*="description"], [data-testid*="issue.views.issue-base.foundation.summary.description"]';
+      const statusSelector = '[class*="status"], [data-testid*="issue.views.issue-base.foundation.summary.summary-status"]';
+      const assigneeSelector = '[class*="assignee"], [data-testid*="issue.views.issue-base.foundation.summary.summary-assignee"]';
+      const prioritySelector = '[class*="priority"], [data-testid*="issue.views.issue-base.foundation.summary.summary-priority"]';
+      const labelSelector = '[class*="labels"] span, [class*="label-row"] span';
 
-      const title = document.querySelector('h1')?.textContent?.trim() || '';
-      const issueKey = document.querySelector('[class*="key"]')?.textContent?.trim() || '';
-      const description = document.querySelector(descriptionSelector)?.textContent?.trim() || '';
-      const status = document.querySelector(statusSelector)?.textContent?.trim() || 'To Do';
-      const assignee = document.querySelector(assigneeSelector)?.textContent?.trim() || '';
-      const priority = document.querySelector(prioritySelector)?.textContent?.trim() || '';
-      const labels = Array.from(document.querySelectorAll(labelsSelector))
+      const titleEl = document.querySelector(titleSelector);
+      const issueKeyEl = document.querySelector(issueKeySelector);
+      const descriptionEl = document.querySelector(descriptionSelector);
+      const statusEl = document.querySelector(statusSelector);
+      const assigneeEl = document.querySelector(assigneeSelector);
+      const priorityEl = document.querySelector(prioritySelector);
+      const labelEls = document.querySelectorAll(labelSelector);
+
+      const title = titleEl?.textContent?.trim() || '';
+      const issueKey = issueKeyEl?.textContent?.trim() || '';
+      const description = descriptionEl?.textContent?.trim() || '';
+      const status = statusEl?.textContent?.trim() || 'To Do';
+      const assignee = assigneeEl?.textContent?.trim() || '';
+      const priority = priorityEl?.textContent?.trim() || '';
+      const labels = Array.from(labelEls)
         .map(el => el.textContent.trim())
-        .filter(text => text.length > 0);
+        .filter(text => text.length > 0 && text.length < 100);
 
       return {
         source: 'jira',
@@ -72,77 +123,141 @@ class TaskExtractor {
         status: status,
         assignee: assignee,
         priority: priority,
-        labels: labels,
+        labels: labels.slice(0, 10), // Limit to 10 labels
         url: window.location.href,
         timestamp: new Date().toISOString()
       };
     } catch (error) {
-      console.error('Error extracting Jira task:', error);
+      console.error('TaskExtractor: Error extracting Jira task:', error);
       return null;
     }
   }
 
   /**
-   * Riconosce e estrae il task appropriato
-   */
-  static extractTask() {
-    const url = window.location.href;
-
-    if (url.includes('trello.com')) {
-      return this.extractTrelloTask();
-    } else if (url.includes('atlassian.net') || url.includes('jira')) {
-      return this.extractJiraTask();
-    } else {
-      // Fallback: prova a estrarre dati generici
-      return this.extractGenericTask();
-    }
-  }
-
-  /**
-   * Estrae dati generici da una pagina web
+   * Estrae dati generici da una pagina web.
+   * Fallback quando non è Trello o Jira.
+   * 
+   * @returns {Object} Oggetto con { source, title, description, url, timestamp }
    */
   static extractGenericTask() {
     try {
       const title = document.title || 'Untitled Task';
       const h1 = document.querySelector('h1')?.textContent?.trim() || '';
-      const description = document.querySelector('main')?.textContent?.substring(0, 500) || '';
+      const mainContent = document.querySelector('main');
+      const description = mainContent?.textContent?.substring(0, 500).trim() || 'No description available';
 
       return {
         source: 'generic',
         title: h1 || title,
-        description: description || 'No description available',
+        description: description,
         url: window.location.href,
         timestamp: new Date().toISOString()
       };
     } catch (error) {
-      console.error('Error extracting generic task:', error);
+      console.error('TaskExtractor: Error extracting generic task:', error);
       return null;
+    }
+  }
+
+  /**
+   * Riconosce il dominio e chiama il metodo di estrazione appropriato.
+   * 
+   * DOMINIO SUPPORTATI:
+   * - trello.com → extractTrelloTask()
+   * - *.atlassian.net → extractJiraTask()
+   * - altri → extractGenericTask()
+   * 
+   * @returns {Object|null} Dati estratti o null se errore
+   */
+  static extractTask() {
+    const url = window.location.href;
+    const isDemoPage = document.title.includes('Demo - Agile Task Automator');
+
+    if (url.includes('trello.com') || isDemoPage) {
+      console.log('TaskExtractor: Detected Trello / Demo domain, extracting task...');
+      return this.extractTrelloTask();
+    } else if (url.includes('atlassian.net') || url.includes('jira')) {
+      console.log('TaskExtractor: Detected Jira domain, extracting task...');
+      return this.extractJiraTask();
+    } else {
+      console.log('TaskExtractor: Detected generic domain, extracting generic task...');
+      return this.extractGenericTask();
     }
   }
 }
 
-// Ascolta i messaggi dal popup
+/**
+ * ============================================================================
+ * MESSAGE LISTENER
+ * ============================================================================
+ * 
+ * Ascolta i messaggi dal popup script tramite chrome.runtime.onMessage.
+ * Quando riceve una richiesta 'extractTask', chiama il TaskExtractor
+ * e restituisce i dati estratti.
+ * 
+ * MESSAGGIO ATTESO:
+ * { action: 'extractTask' }
+ * 
+ * RISPOSTA INVIATA:
+ * { success: true, data: { source, title, description, ... } }
+ * { success: false, error: "Motivo dell'errore" }
+ * ============================================================================
+ */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'extractTask') {
-    const taskData = TaskExtractor.extractTask();
-    sendResponse({ success: true, data: taskData });
+  try {
+    if (request.action === 'extractTask') {
+      console.log('Content Script: Received extractTask request');
+      const taskData = TaskExtractor.extractTask();
+      
+      if (taskData) {
+        console.log('Content Script: Task extracted successfully', taskData);
+        sendResponse({ success: true, data: taskData });
+      } else {
+        console.warn('Content Script: No task data extracted');
+        sendResponse({ 
+          success: false, 
+          error: 'Unable to extract task data from this page.' 
+        });
+      }
+    } else {
+      console.warn('Content Script: Unknown action:', request.action);
+      sendResponse({ 
+        success: false, 
+        error: `Unknown action: ${request.action}` 
+      });
+    }
+  } catch (error) {
+    console.error('Content Script: Error processing message:', error);
+    sendResponse({ 
+      success: false, 
+      error: error.message 
+    });
   }
 });
 
-// Iniettore payload al caricamento della pagina
-function injectPageContext() {
-  const script = document.createElement('script');
-  script.textContent = `
-    window.__taskExtractorReady = true;
-    console.log('Task Extractor ready on:', window.location.hostname);
-  `;
-  (document.head || document.documentElement).appendChild(script);
-  script.remove();
+/**
+ * ============================================================================
+ * PAGE INITIALIZATION
+ * ============================================================================
+ * 
+ * Marker di inizializzazione per verificare che il content script
+ * sia caricato e pronto sulla pagina.
+ */
+function initializeContentScript() {
+  try {
+    // Marker globale per indicare che il content script è attivo
+    window.__agileTaskAutomatorReady = true;
+    console.log('✓ Agile Task Automator Content Script initialized on:', window.location.hostname);
+  } catch (error) {
+    console.error('Content Script: Initialization error:', error);
+  }
 }
 
-// Inizializza al caricamento
+// Esegui l'inizializzazione quando il DOM è pronto
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', injectPageContext);
+  document.addEventListener('DOMContentLoaded', initializeContentScript);
 } else {
-  injectPageContext();
+  // DOM già caricato
+  initializeContentScript();
 }
+

@@ -10,7 +10,6 @@
     "build": "echo 'Extension ready for production'",
     "dev": "echo 'Development mode active - Reload extension after making changes'"
   },
-  "devDependencies": {},
   "keywords": [
     "chrome-extension",
     "trello",
@@ -23,5 +22,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/yourusername/agile-task-automator"
+  },
+  "dependencies": {
+    "puppeteer": "^24.40.0"
   }
 }
