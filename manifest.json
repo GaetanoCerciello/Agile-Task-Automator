@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Agile Task Automator",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Trasforma appunti in documentazione tecnica Agile (Markdown) tramite copia-incolla. Veloce, leggero e sicuro.",
   "action": {
     "default_popup": "popup.html",
